@@ -1,0 +1,9 @@
+version "0.1"
+package "sort_index"
+purpose "Lab6 2024 osisp"
+
+args "--unnamed-opts --include-getopt  --file-name=generate_cmdline"
+
+# Options
+option "blocks"  b "порядок разбиения буфера" int optional
+option "filename" f "имя файла" string required
