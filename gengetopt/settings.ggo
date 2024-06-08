@@ -1,0 +1,11 @@
+version "0.1"
+package "sort_index"
+purpose "Lab6 2024 osisp"
+
+args "--unnamed-opts --include-getopt"
+
+# Options
+option "memsize" m "размер рабочего буфера, кратный размеру страницы (getpagesize())" int optional
+option "blocks"  b "порядок разбиения буфера" int optional
+option "threads" t "количество потоков (от k до N)" int optional
+option "filename" f "имя файла" string required
