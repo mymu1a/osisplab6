@@ -1,28 +1,14 @@
 #include "globals.h"
 
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <sys/stat.h>        /* For mode constants */
 #include <fcntl.h>           /* For O_* constants */
 
-
 #include "gengetopt/generate_cmdline.h"
 
 struct gengetopt_args_info	config;
-
-struct index_s 
-{
-    double          time_mark;               // временная метка (модифицированная юлианская дата)
-    uint64_t        recno;                   // первичный индекс в таблице БД
-};
-
-struct index_hdr_s
-{
-    uint64_t        recsords;                // количество записей
-    struct index_s  idx[1];                  // массив записей в количестве records
-};
 
 void generateRecord(index_s* pRecord, uint64_t index);
 void writeRecord(index_s* pRecord, int fd);
@@ -34,10 +20,7 @@ int main(int argc, char** argv)
     {
         exit(1);
     }
-    
-    uint64_t index;
     int fd;
-    uint64_t countRecord;
 
 	fd = open(config.filename_arg, O_RDWR | O_CREAT, 0666);
     if (fd < 0)
@@ -45,17 +28,20 @@ int main(int argc, char** argv)
         printf("Error: cannot open file:\n");
         return 1;
     }
+    uint64_t index;
+    uint64_t countRecord;
+
     index = 1;
     
     if (config.blocks_arg == 0)
     { // default value
-        countRecord = COUNT_BLOCK;
+        countRecord = COUNT_BLOCK_TOTAL;
     }
     else
     {
         countRecord = config.blocks_arg % 256;
     }
-    write(fd, (void*)&countRecord, 8);
+    write(fd, (void*)&countRecord, sizeof(uint64_t));
 
     index_s record;
     while (index++ <= countRecord)
