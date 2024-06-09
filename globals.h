@@ -1,3 +1,6 @@
+#ifndef __GLOBALS_H__
+#define __GLOBALS_H__
+
 #include <unistd.h>
 #include <stdint.h>
 
@@ -18,3 +21,5 @@ struct index_hdr_s
     uint64_t        recsords;                // количество записей
     struct index_s  idx[1];                  // массив записей в количестве records
 };
+
+#endif // __GLOBALS_H__

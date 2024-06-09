@@ -24,61 +24,74 @@ int main(int argc, char** argv)
     printf("config.threads: %d\n", config.threads_arg);
     printf("config.filename: %s\n", config.filename_arg);
 
-    // open file with Records
-    int fd;
+    //=== create File Object ===
+    struct dataFileStruct   dataFile;
 
-    fd = open(config.filename_arg, O_RDWR | O_CREAT, 0666);
-    if (fd < 0)
+    // open file with Records
+
+    dataFile.fd = open(config.filename_arg, O_RDWR | O_CREAT, 0666);
+    if (dataFile.fd < 0)
     {
-        printf("Error: cannot open file:\n");
+        printf("Error: cannot open file: %s\n", config.filename_arg);
         return 1;
     }
     // read total count Records ( that contains in File )
-    uint64_t countRecordTotal;
-    uint64_t offset;
+    struct stat sb;
 
-    read(fd, (void*)&countRecordTotal, sizeof(uint64_t));
-    offset = sizeof(uint64_t);
+    fstat(dataFile.fd, &sb);
+    dataFile.sizeFile = sb.st_size;
+
+    if (dataFile.sizeFile < sizeof(uint64_t))
+    {
+        printf("Error: cannot read number of Records ( file is too small )\n");
+        return 1;
+    }
+    read(dataFile.fd, (void*)&dataFile.countRecordOnDisk, sizeof(uint64_t));
+    dataFile.offset = sizeof(uint64_t);
+    printf("countRecordOnDisk=%ld\n", dataFile.countRecordOnDisk);
 
     // calc count Records in Memory
-    uint64_t countRecord;
 
     if (config.memsize_arg == 0)
     { // default value
-        countRecord = COUNT_BLOCK_MEMORY;
+        dataFile.countRecordInMemory = COUNT_BLOCK_MEMORY;
     }
     else
     {
-        countRecord = config.memsize_arg % sizeof(index_s);
+        dataFile.countRecordInMemory = config.memsize_arg % sizeof(index_s);
     }
+    printf("countRecordInMemory=%ld\n", dataFile.countRecordInMemory);
+
+    //=== create Synchronization Objects ===
+    struct dataSyncStruct    dataSync;
+
     // read count Thread
-    uint64_t countThread;
-
     if (config.threads_arg == 0)
-    { // default value
-        countThread = COUNT_THREAD;
+    {
+        dataSync.countThread = COUNT_THREAD;              // default value
     }
     else
     {
-        countThread = config.threads_arg;
+        dataSync.countThread = config.threads_arg;
     }
-    // initialize Barrier
-    pthread_barrier_t   barrier;
+    dataSync.countOnBarrier = 0;		                  // count Threads on Barrier
+    dataSync.indexRecord    = 0;		                  // Index Map
+    dataSync.operation      = TO_NONE;
 
-    if (pthread_barrier_init(&barrier, NULL, countThread) != 0)
+    // initialize Barrier
+    if (pthread_barrier_init(&dataSync.barrier, NULL, dataSync.countThread) != 0)
     {
         printf("Error: cannot initialize Barrier:\n");
         return 1;
     }
     // initialize mutex to restrict access to Index Map
-    pthread_mutex_t mutex;
-
-    if (pthread_mutex_init(&mutex, NULL) != 0)
+    if (pthread_mutex_init(&dataSync.mutex, NULL) != 0)
     {
         printf("Error: cannot initialize Mutex:\n");
         return 1;
     }
-    // create working Threads
+
+    //=== create Threads ===
     unsigned        indexThread;
     TYPE_OPERATION  operation;
     uint64_t        indexRecord;        // Index Map
@@ -86,23 +99,28 @@ int main(int argc, char** argv)
     struct dataThread* pThread;
 
     indexThread = 1;
-    operation = TO_SORT;
 
-    for (int i = 1; i < countThread; i++)
+    // working Thread start
+    for (int i = 1; i < dataSync.countThread; i++)
     {
         pThread = (dataThread*)malloc(sizeof(struct dataThread));
+
         pThread->index      = indexThread++;
-
-        pThread->pIndexRecord = &indexRecord;
-        pThread->pCountRecord = &countRecord;
-
-        pThread->pOperation = &operation;
-        pThread->pBarrier   = &barrier;
-        pThread->pMutex     = &mutex;
+        pThread->pDataFile  = &dataFile;
+        pThread->pDataSync  = &dataSync;
 
         pthread_create(&pThread->idThread, NULL, &threadFunction, (void*)pThread);
         pthread_detach(pThread->idThread);			// will use detached threads
     }
+    // main Thread
+    pThread = (dataThread*)malloc(sizeof(struct dataThread));
+
+    pThread->index      = 0;
+    pThread->pDataFile  = &dataFile;
+    pThread->pDataSync  = &dataSync;
+    pThread->idThread   = 0;
+
+    threadFunction(pThread);
 
     return 0;
 }

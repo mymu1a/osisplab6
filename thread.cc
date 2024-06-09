@@ -5,28 +5,160 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <sys/mman.h>
 
-void* threadFunction(void* pData)
+
+void* threadFunction(void* pData_)
 {
-	pthread_barrier_wait(pData->pBarrier);
+	dataThread* pData = (dataThread*)pData_;
 
-	bool isWork = false;
+	bool	isWork = false;
 
-	pthread_mutex_lock(pData->pMutex);									// mutex lock
-	if (pData->pOperation == TO_SORT)
+	while (1)
 	{
-		if (pData->indexRecord < pData->pCountRecord)
+		if(isWork == false)
+		pthread_barrier_wait(&pData->pDataSync->barrier);								// Barrier
+
+		if (pData->pDataSync->operation == TO_EXIT)
 		{
-			isWork = true;
-			pData->indexRecord++;
+			printf("Exit: Thread_%02d:\n", pData->index);
+			pthread_exit(NULL);
+		}
+		uint64_t	indexRecord;
+
+		pthread_mutex_lock(&pData->pDataSync->mutex);									// mutex lock
+		if (pData->pDataSync->operation == TO_SORT)
+		{
+			if (pData->pDataSync->indexRecord < pData->pDataFile->countRecord)			// count Records in Memory ( real )
+			{
+				isWork = true;
+				indexRecord = pData->pDataSync->indexRecord;
+
+				pData->pDataSync->indexRecord++;
+				printf("indexRecord = %02ld\n", indexRecord);
+			}
+			else
+			{
+				isWork = false;
+				printf(" all read\n");
+			}
+		}
+		if (pData->pDataSync->operation == TO_MERGE)
+		{
+			isWork = false;
+		}
+
+		// we go on Barrier
+		if (isWork == false)
+		{
+			pData->pDataSync->countOnBarrier++;
+			printf("\tgo on Barrier - Thread_%02d\n", pData->index);
+			if (pData->pDataSync->countOnBarrier == pData->pDataSync->countThread)
+			{
+				switchNextOperation(pData);
+			}
+		}
+		pthread_mutex_unlock(&pData->pDataSync->mutex);								// mutex unlock
+		if (isWork == false)
+		{
+			continue;
+		}
+
+		if (pData->pDataSync->operation == TO_SORT)
+		{
+			sort(indexRecord, pData->index);
+			usleep(1);
 		}
 	}
-	pthread_mutex_unlock(pData->pMutex);								// mutex unlock
+	return NULL;
+}
 
-	if (isWork == true)
+// read next Block of Records from Disk to Memory
+bool readNextRecordBlock(struct dataFileStruct& file)
+{
+	printf("readNextRecordBlock ST\n");
+	printf("  file.sizeFile=%d\n", file.sizeFile);
+	printf("  file.offset=%d\n", file.offset);
+
+	// there are no space for Record
+	size_t sizeToRead;
+	
+	sizeToRead = file.sizeFile - file.offset;
+	printf("  sizeToRead=%d\n", sizeToRead);
+	printf("  sizeof(index_s)=%ld\n", sizeof(index_s));
+
+	if (sizeToRead < sizeof(index_s))
 	{
-		if (pData->pOperation == TO_SORT)
-		{
-		}
+		return false;
 	}
+	unsigned  count;
+
+	count = sizeToRead / sizeof(index_s);
+	if (count > file.countRecordInMemory)
+	{
+		count = file.countRecordInMemory;		// count Records in Memory ( max )
+	}
+	printf("  count=%d\n", count);
+	file.countRecord = count;
+
+	sizeToRead = count * sizeof(index_s);
+	printf("  sizeToRead-2=%d\n", sizeToRead);
+
+	file.pHeapMemory = mmap(NULL, sizeToRead, PROT_READ | PROT_WRITE, MAP_SHARED, file.fd, file.offset);
+	if (file.pHeapMemory == NULL)
+	{
+		printf("Error: cannot map Records in the Memory\n");
+		return false;
+	}
+	file.offset += sizeToRead;
+	printf("  file.offset=%d\n", file.offset);
+
+	printf("readNextRecordBlock OK\n");
+	return true;
+}
+
+void sort(uint64_t indexRecord, unsigned indexThread)
+{
+	printf("sort ST ( indexThread = %02d )\n", indexThread);
+
+	printf("sort OK\n");
+
+}
+
+void switchNextOperation(struct dataThread* pData)
+{
+	printf("switchNextOperation ST ( Thread_%02d )\n", pData->index);
+
+	pData->pDataSync->countOnBarrier = 0;
+	pData->pDataSync->indexRecord = 0;
+	
+	if (pData->pDataSync->operation == TO_NONE)
+	{
+		if (readNextRecordBlock(*pData->pDataFile) == false)
+		{
+			pData->pDataSync->operation = TO_EXIT;
+			return;
+		}
+		pData->pDataSync->operation = TO_SORT;
+		printf("switchNextOperation OK [ TO_NONE --> TO_SORT ]\n");
+		return;
+	}
+	if (pData->pDataSync->operation == TO_SORT)
+	{
+		if (readNextRecordBlock(*pData->pDataFile) == true)
+		{
+			return;		// continue TO_SORT operation
+		}
+		printf("switchNextOperation OK [ TO_SORT --> TO_MERGE ]\n");
+		pData->pDataSync->operation = TO_MERGE;
+		return;
+	}
+	if (pData->pDataSync->operation == TO_MERGE)
+	{
+
+		pData->pDataSync->operation = TO_EXIT;
+		printf("switchNextOperation OK [ TO_MERGE --> TO_EXIT ]\n");
+		return;
+	}
+	printf("switchNextOperation OK\n");
 }
