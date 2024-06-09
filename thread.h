@@ -8,17 +8,17 @@ enum TYPE_OPERATION { TO_NONE, TO_SORT, TO_MERGE, TO_EXIT };
 struct dataFileStruct
 {
 	const char* name;
-	uint64_t	countRecordOnDisk;			// total count Records in File ( on disk )
+	uint64_t	countRecordOnDisk;				// total count Records in File ( on disk )
 	
 	// current disk state
 	int			fd;
-	off_t		sizeFile;					// file size
-	uint64_t	offset;						// number of bytes actually read
+	off_t		sizeFile;						// file size
+	uint64_t	offset;							// number of bytes actually read
 
 	// file part read to the Memory
-	uint64_t	countRecordInMemory;		// count Records in Memory ( max )
-	uint64_t	countRecord;				// count Records in Memory ( real )
-	void*		pHeapMemory;
+	uint64_t		countRecordInMemory;		// count Records in Memory ( max )
+	uint64_t		countRecord;				// count Records in Memory ( real )
+	void*			pHeapMemory;
 };
 
 struct dataSyncStruct
@@ -44,5 +44,6 @@ struct dataThread
 
 void* threadFunction(void* pData);
 bool readNextRecordBlock(struct dataFileStruct& file);
-void sort(uint64_t indexRecord, unsigned indexThread);
-void switchNextOperation(struct dataThread* pData);
+void sort(void* pHeapMemory, uint64_t indexRecord, unsigned indexThread);
+void switchNextOperation(struct dataThread* pData, unsigned stepMerge);
+void merge(void* pHeapMemory, uint64_t indexRecord, unsigned countMerge, unsigned indexThread);

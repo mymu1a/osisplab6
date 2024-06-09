@@ -6,7 +6,7 @@
 
 
 #define COUNT_BLOCK_TOTAL   256
-#define COUNT_BLOCK_MEMORY	25
+#define COUNT_BLOCK_MEMORY	32
 #define COUNT_THREAD	    4
 
 

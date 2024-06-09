@@ -12,7 +12,8 @@ void* threadFunction(void* pData_)
 {
 	dataThread* pData = (dataThread*)pData_;
 
-	bool	isWork = false;
+	bool		isWork = false;
+	unsigned	stepMerge = 2;
 
 	while (1)
 	{
@@ -43,9 +44,22 @@ void* threadFunction(void* pData_)
 				printf(" all read\n");
 			}
 		}
+
 		if (pData->pDataSync->operation == TO_MERGE)
 		{
-			isWork = false;
+			if (pData->pDataSync->indexRecord < pData->pDataFile->countRecord)			// count Records in Memory ( real )
+			{
+				isWork = true;
+				indexRecord = pData->pDataSync->indexRecord;
+				
+				pData->pDataSync->indexRecord += stepMerge;
+				printf("indexRecord = %02ld\n", indexRecord);
+			}
+			else
+			{
+				isWork = false;
+				printf(" all merge\n");
+			}
 		}
 
 		// we go on Barrier
@@ -55,7 +69,7 @@ void* threadFunction(void* pData_)
 			printf("\tgo on Barrier - Thread_%02d\n", pData->index);
 			if (pData->pDataSync->countOnBarrier == pData->pDataSync->countThread)
 			{
-				switchNextOperation(pData);
+				switchNextOperation(pData, stepMerge);
 			}
 		}
 		pthread_mutex_unlock(&pData->pDataSync->mutex);								// mutex unlock
@@ -66,12 +80,25 @@ void* threadFunction(void* pData_)
 
 		if (pData->pDataSync->operation == TO_SORT)
 		{
-			sort(indexRecord, pData->index);
+			sort(pData->pDataFile->pHeapMemory, indexRecord, pData->index);
+			usleep(1);
+		}
+		if (pData->pDataSync->operation == TO_MERGE)
+		{
+			merge(pData->pDataFile->pHeapMemory, indexRecord, stepMerge, pData->index);
 			usleep(1);
 		}
 	}
 	return NULL;
 }
+
+void merge(void* pMemory, uint64_t indexRecord, unsigned countMerge, unsigned indexThread)
+{
+	printf("merge ST ( indexThread = %02d )\n", indexThread);
+
+	printf("merge OK\n");
+}
+
 
 // read next Block of Records from Disk to Memory
 bool readNextRecordBlock(struct dataFileStruct& file)
@@ -117,15 +144,17 @@ bool readNextRecordBlock(struct dataFileStruct& file)
 	return true;
 }
 
-void sort(uint64_t indexRecord, unsigned indexThread)
+void sort(void* pHeapMemory, uint64_t indexRecord, unsigned indexThread)
 {
 	printf("sort ST ( indexThread = %02d )\n", indexThread);
+
+	qsort();
 
 	printf("sort OK\n");
 
 }
 
-void switchNextOperation(struct dataThread* pData)
+void switchNextOperation(struct dataThread* pData, unsigned stepMerge)
 {
 	printf("switchNextOperation ST ( Thread_%02d )\n", pData->index);
 
@@ -145,17 +174,23 @@ void switchNextOperation(struct dataThread* pData)
 	}
 	if (pData->pDataSync->operation == TO_SORT)
 	{
-		if (readNextRecordBlock(*pData->pDataFile) == true)
-		{
-			return;		// continue TO_SORT operation
-		}
 		printf("switchNextOperation OK [ TO_SORT --> TO_MERGE ]\n");
+		stepMerge = 2;
 		pData->pDataSync->operation = TO_MERGE;
 		return;
 	}
 	if (pData->pDataSync->operation == TO_MERGE)
 	{
-
+		stepMerge *= 2;
+		if (stepMerge <= pData->pDataFile->countRecord)
+		{
+			return;												// continue Merge Operation
+		}
+		if (readNextRecordBlock(*pData->pDataFile) == true)
+		{
+			pData->pDataSync->operation = TO_SORT;				// sort next Record Block
+			return;
+		}
 		pData->pDataSync->operation = TO_EXIT;
 		printf("switchNextOperation OK [ TO_MERGE --> TO_EXIT ]\n");
 		return;
