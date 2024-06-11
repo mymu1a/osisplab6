@@ -8,6 +8,7 @@
 #include <sys/mman.h>
 
 
+
 void* threadFunction(void* pData_)
 {
 	dataThread* pData = (dataThread*)pData_;
@@ -35,7 +36,7 @@ void* threadFunction(void* pData_)
 				isWork = true;
 				indexRecord = pData->pDataSync->indexRecord;
 
-				pData->pDataSync->indexRecord++;
+				pData->pDataSync->indexRecord += pData->pDataFile->countRecordInBlock;	// move to the next Block
 				printf("indexRecord = %02ld\n", indexRecord);
 			}
 			else
@@ -80,7 +81,7 @@ void* threadFunction(void* pData_)
 
 		if (pData->pDataSync->operation == TO_SORT)
 		{
-			sort(pData->pDataFile->pHeapMemory, indexRecord, pData->index);
+			sort(pData->pDataFile->pHeapMemory, indexRecord, pData->pDataFile->countRecordInBlock, pData->index /* thread index */);
 			usleep(1);
 		}
 		if (pData->pDataSync->operation == TO_MERGE)
@@ -92,10 +93,41 @@ void* threadFunction(void* pData_)
 	return NULL;
 }
 
-void merge(void* pMemory, uint64_t indexRecord, unsigned countMerge, unsigned indexThread)
+void merge(void* pHeapMemory, uint64_t indexRecord, unsigned countMerge, unsigned indexThread)
 {
 	printf("merge ST ( indexThread = %02d )\n", indexThread);
 
+	uint64_t	countBlock;
+	uint64_t	index1 = 0, index2 = 0, indexMerged = 0;
+	index_s		*pBlock1, *pBlock2;
+	index_s*	pMerged;
+
+	countBlock = countMerge / 2;
+
+	pBlock1 = (index_s*)pHeapMemory + indexRecord;
+	pBlock2 = pBlock1 + countBlock;
+
+	pMerged = (index_s*)malloc(sizeof(index_s) * countMerge);
+
+	while (index1 < countBlock && index2 < countBlock)
+	{
+		if (pBlock1[index1].time_mark < pBlock2[index2].time_mark)
+		{
+			pMerged[indexMerged++] = pBlock1[index1++];
+		}
+		else
+		{
+			pMerged[indexMerged++] = pBlock2[index2++];
+		}
+	}
+	while (index1 < countBlock)
+	{
+		pMerged[indexMerged++] = pBlock1[index1++];
+	}
+	while (index2 < countBlock)
+	{
+		pMerged[indexMerged++] = pBlock2[index2++];
+	}
 	printf("merge OK\n");
 }
 
@@ -144,17 +176,35 @@ bool readNextRecordBlock(struct dataFileStruct& file)
 	return true;
 }
 
-void sort(void* pHeapMemory, uint64_t indexRecord, unsigned indexThread)
+int compare(const void* pRecord1, const void* pRecord2)
+{
+
+	index_s* r1 = (index_s*)pRecord1;
+	index_s* r2 = (index_s*)pRecord2;
+
+	if (r1->time_mark < r2->time_mark)
+	{
+		return -1;
+	}
+	if (r1->time_mark > r2->time_mark)
+	{
+		return 1;
+	}
+	return 0;
+}
+
+void sort(void* pHeapMemory, uint64_t indexRecord, uint64_t countRecordInBlock, unsigned indexThread)
 {
 	printf("sort ST ( indexThread = %02d )\n", indexThread);
 
-	qsort();
+	index_s* pBlock = (index_s*)pHeapMemory + indexRecord;
+	qsort((void*)pBlock, countRecordInBlock, sizeof(index_s), compare);
 
 	printf("sort OK\n");
 
 }
 
-void switchNextOperation(struct dataThread* pData, unsigned stepMerge)
+void switchNextOperation(struct dataThread* pData, unsigned& stepMerge)
 {
 	printf("switchNextOperation ST ( Thread_%02d )\n", pData->index);
 
@@ -175,7 +225,7 @@ void switchNextOperation(struct dataThread* pData, unsigned stepMerge)
 	if (pData->pDataSync->operation == TO_SORT)
 	{
 		printf("switchNextOperation OK [ TO_SORT --> TO_MERGE ]\n");
-		stepMerge = 2;
+		stepMerge = pData->pDataFile->countRecordInBlock *2;
 		pData->pDataSync->operation = TO_MERGE;
 		return;
 	}

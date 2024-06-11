@@ -35,7 +35,7 @@ const char *gengetopt_args_info_description = "";
 const char *gengetopt_args_info_help[] = {
   "  -h, --help             Print help and exit",
   "  -V, --version          Print version and exit",
-  "  -b, --blocks=INT       порядок разбиения буфера",
+  "  -r, --recordNo=INT     количество записей в файле",
   "  -f, --filename=STRING  имя файла",
     0
 };
@@ -65,7 +65,7 @@ void clear_given (struct gengetopt_args_info *args_info)
 {
   args_info->help_given = 0 ;
   args_info->version_given = 0 ;
-  args_info->blocks_given = 0 ;
+  args_info->recordNo_given = 0 ;
   args_info->filename_given = 0 ;
 }
 
@@ -73,7 +73,7 @@ static
 void clear_args (struct gengetopt_args_info *args_info)
 {
   FIX_UNUSED (args_info);
-  args_info->blocks_orig = NULL;
+  args_info->recordNo_orig = NULL;
   args_info->filename_arg = NULL;
   args_info->filename_orig = NULL;
   
@@ -86,7 +86,7 @@ void init_args_info(struct gengetopt_args_info *args_info)
 
   args_info->help_help = gengetopt_args_info_help[0] ;
   args_info->version_help = gengetopt_args_info_help[1] ;
-  args_info->blocks_help = gengetopt_args_info_help[2] ;
+  args_info->recordNo_help = gengetopt_args_info_help[2] ;
   args_info->filename_help = gengetopt_args_info_help[3] ;
   
 }
@@ -180,7 +180,7 @@ static void
 cmdline_parser_release (struct gengetopt_args_info *args_info)
 {
   unsigned int i;
-  free_string_field (&(args_info->blocks_orig));
+  free_string_field (&(args_info->recordNo_orig));
   free_string_field (&(args_info->filename_arg));
   free_string_field (&(args_info->filename_orig));
   
@@ -222,8 +222,8 @@ cmdline_parser_dump(FILE *outfile, struct gengetopt_args_info *args_info)
     write_into_file(outfile, "help", 0, 0 );
   if (args_info->version_given)
     write_into_file(outfile, "version", 0, 0 );
-  if (args_info->blocks_given)
-    write_into_file(outfile, "blocks", args_info->blocks_orig, 0);
+  if (args_info->recordNo_given)
+    write_into_file(outfile, "recordNo", args_info->recordNo_orig, 0);
   if (args_info->filename_given)
     write_into_file(outfile, "filename", args_info->filename_orig, 0);
   
@@ -1109,7 +1109,7 @@ cmdline_parser_internal (
       static struct option long_options[] = {
         { "help",	0, NULL, 'h' },
         { "version",	0, NULL, 'V' },
-        { "blocks",	1, NULL, 'b' },
+        { "recordNo",	1, NULL, 'r' },
         { "filename",	1, NULL, 'f' },
         { 0,  0, 0, 0 }
       };
@@ -1119,7 +1119,7 @@ cmdline_parser_internal (
       custom_opterr = opterr;
       custom_optopt = optopt;
 
-      c = custom_getopt_long (argc, argv, "hVb:f:", long_options, &option_index);
+      c = custom_getopt_long (argc, argv, "hVr:f:", long_options, &option_index);
 
       optarg = custom_optarg;
       optind = custom_optind;
@@ -1140,14 +1140,14 @@ cmdline_parser_internal (
           cmdline_parser_free (&local_args_info);
           exit (EXIT_SUCCESS);
 
-        case 'b':	/* порядок разбиения буфера.  */
+        case 'r':	/* количество записей в файле.  */
         
         
-          if (update_arg( (void *)&(args_info->blocks_arg), 
-               &(args_info->blocks_orig), &(args_info->blocks_given),
-              &(local_args_info.blocks_given), optarg, 0, 0, ARG_INT,
+          if (update_arg( (void *)&(args_info->recordNo_arg), 
+               &(args_info->recordNo_orig), &(args_info->recordNo_given),
+              &(local_args_info.recordNo_given), optarg, 0, 0, ARG_INT,
               check_ambiguity, override, 0, 0,
-              "blocks", 'b',
+              "recordNo", 'r',
               additional_error))
             goto failure;
         

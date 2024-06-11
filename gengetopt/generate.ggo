@@ -5,5 +5,5 @@ purpose "Lab6 2024 osisp"
 args "--unnamed-opts --include-getopt  --file-name=generate_cmdline"
 
 # Options
-option "blocks"  b "порядок разбиения буфера" int optional
+option "recordNo" r "количество записей в файле" int optional
 option "filename" f "имя файла" string required

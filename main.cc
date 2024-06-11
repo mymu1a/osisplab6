@@ -20,7 +20,7 @@ int main(int argc, char** argv)
         exit(1);
     }
     printf("config.memsize: %d\n", config.memsize_arg);
-//    printf("config.blocks: %d\n", config.blocks_arg);
+    printf("config.blocks: %d\n", config.blocks_arg);
     printf("config.threads: %d\n", config.threads_arg);
     printf("config.filename: %s\n", config.filename_arg);
 
@@ -50,11 +50,23 @@ int main(int argc, char** argv)
     dataFile.offset = sizeof(uint64_t);
     printf("countRecordOnDisk=%ld\n", dataFile.countRecordOnDisk);
 
+    // calc count Records in Block
+
+    if (config.blocks_arg == 0)
+    { // default value
+        dataFile.countRecordInBlock = COUNT_RECORD_INBLOCK;
+    }
+    else
+    {
+        dataFile.countRecordInBlock = config.blocks_arg;
+    }
+    printf("countRecordInBlock=%ld\n", dataFile.countRecordInBlock);
+
     // calc count Records in Memory
 
     if (config.memsize_arg == 0)
     { // default value
-        dataFile.countRecordInMemory = COUNT_BLOCK_MEMORY;
+        dataFile.countRecordInMemory = COUNT_RECORD_INMEMORY;
     }
     else
     {

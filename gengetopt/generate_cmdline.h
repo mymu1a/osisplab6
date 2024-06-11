@@ -39,16 +39,16 @@ struct gengetopt_args_info
 {
   const char *help_help; /**< @brief Print help and exit help description.  */
   const char *version_help; /**< @brief Print version and exit help description.  */
-  int blocks_arg;	/**< @brief порядок разбиения буфера.  */
-  char * blocks_orig;	/**< @brief порядок разбиения буфера original value given at command line.  */
-  const char *blocks_help; /**< @brief порядок разбиения буфера help description.  */
+  int recordNo_arg;	/**< @brief количество записей в файле.  */
+  char * recordNo_orig;	/**< @brief количество записей в файле original value given at command line.  */
+  const char *recordNo_help; /**< @brief количество записей в файле help description.  */
   char * filename_arg;	/**< @brief имя файла.  */
   char * filename_orig;	/**< @brief имя файла original value given at command line.  */
   const char *filename_help; /**< @brief имя файла help description.  */
   
   unsigned int help_given ;	/**< @brief Whether help was given.  */
   unsigned int version_given ;	/**< @brief Whether version was given.  */
-  unsigned int blocks_given ;	/**< @brief Whether blocks was given.  */
+  unsigned int recordNo_given ;	/**< @brief Whether recordNo was given.  */
   unsigned int filename_given ;	/**< @brief Whether filename was given.  */
 
   char **inputs ; /**< @brief unnamed options (options without names) */

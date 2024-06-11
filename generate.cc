@@ -33,13 +33,13 @@ int main(int argc, char** argv)
 
     index = 1;
     
-    if (config.blocks_arg == 0)
+    if (config.recordNo_arg == 0)
     { // default value
-        countRecord = COUNT_BLOCK_TOTAL;
+        countRecord = COUNT_RECORD_TOTAL;
     }
     else
     {
-        countRecord = config.blocks_arg % 256;
+        countRecord = config.recordNo_arg % 256;
     }
     write(fd, (void*)&countRecord, sizeof(uint64_t));
 
@@ -51,7 +51,7 @@ int main(int argc, char** argv)
     }
     close(fd);
 
-    printf("config.blocks: %d\n", config.blocks_arg);
+    printf("config.blocks: %d\n", config.recordNo_arg);
     printf("config.filename: %s\n", config.filename_arg);
 
     return 0;

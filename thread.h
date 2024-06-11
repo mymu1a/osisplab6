@@ -16,6 +16,7 @@ struct dataFileStruct
 	uint64_t	offset;							// number of bytes actually read
 
 	// file part read to the Memory
+	uint64_t		countRecordInBlock;			// count Records in Block
 	uint64_t		countRecordInMemory;		// count Records in Memory ( max )
 	uint64_t		countRecord;				// count Records in Memory ( real )
 	void*			pHeapMemory;
@@ -44,6 +45,6 @@ struct dataThread
 
 void* threadFunction(void* pData);
 bool readNextRecordBlock(struct dataFileStruct& file);
-void sort(void* pHeapMemory, uint64_t indexRecord, unsigned indexThread);
-void switchNextOperation(struct dataThread* pData, unsigned stepMerge);
+void sort(void* pHeapMemory, uint64_t indexRecord, uint64_t countRecordInBlock, unsigned indexThread);
+void switchNextOperation(struct dataThread* pData, unsigned& stepMerge);
 void merge(void* pHeapMemory, uint64_t indexRecord, unsigned countMerge, unsigned indexThread);
