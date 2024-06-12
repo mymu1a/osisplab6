@@ -7,7 +7,7 @@
 
 #define COUNT_RECORD_TOTAL          256
 #define COUNT_RECORD_INBLOCK	    4
-#define COUNT_RECORD_INMEMORY	    32
+#define COUNT_RECORD_INMEMORY	    256
 #define COUNT_THREAD	            4
 
 

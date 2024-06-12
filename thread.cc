@@ -14,7 +14,6 @@ void* threadFunction(void* pData_)
 	dataThread* pData = (dataThread*)pData_;
 
 	bool		isWork = false;
-	unsigned	stepMerge = 2;
 
 	while (1)
 	{
@@ -42,7 +41,7 @@ void* threadFunction(void* pData_)
 			else
 			{
 				isWork = false;
-				printf(" all read\n");
+				printf(" all sorted\n");
 			}
 		}
 
@@ -53,13 +52,13 @@ void* threadFunction(void* pData_)
 				isWork = true;
 				indexRecord = pData->pDataSync->indexRecord;
 				
-				pData->pDataSync->indexRecord += stepMerge;
-				printf("indexRecord = %02ld\n", indexRecord);
+				pData->pDataSync->indexRecord += pData->pDataFile->stepMerge;
+				printf("indexRecord = %02ld ( step=%d )\n", indexRecord, pData->pDataFile->stepMerge);
 			}
 			else
 			{
 				isWork = false;
-				printf(" all merge\n");
+				printf(" all merged\n");
 			}
 		}
 
@@ -70,7 +69,7 @@ void* threadFunction(void* pData_)
 			printf("\tgo on Barrier - Thread_%02d\n", pData->index);
 			if (pData->pDataSync->countOnBarrier == pData->pDataSync->countThread)
 			{
-				switchNextOperation(pData, stepMerge);
+				switchNextOperation(pData);
 			}
 		}
 		pthread_mutex_unlock(&pData->pDataSync->mutex);								// mutex unlock
@@ -86,7 +85,7 @@ void* threadFunction(void* pData_)
 		}
 		if (pData->pDataSync->operation == TO_MERGE)
 		{
-			merge(pData->pDataFile->pHeapMemory, indexRecord, stepMerge, pData->index);
+			merge(pData->pDataFile->pHeapMemory, indexRecord, pData->pDataFile->stepMerge, pData->index /* thread index */);
 			usleep(1);
 		}
 	}
@@ -95,8 +94,6 @@ void* threadFunction(void* pData_)
 
 void merge(void* pHeapMemory, uint64_t indexRecord, unsigned countMerge, unsigned indexThread)
 {
-	printf("merge ST ( indexThread = %02d )\n", indexThread);
-
 	uint64_t	countBlock;
 	uint64_t	index1 = 0, index2 = 0, indexMerged = 0;
 	index_s		*pBlock1, *pBlock2;
@@ -128,24 +125,30 @@ void merge(void* pHeapMemory, uint64_t indexRecord, unsigned countMerge, unsigne
 	{
 		pMerged[indexMerged++] = pBlock2[index2++];
 	}
-	printf("merge OK\n");
 }
 
 
 // read next Block of Records from Disk to Memory
-bool readNextRecordBlock(struct dataFileStruct& file)
+bool readNextRecordBlock(struct dataFileStruct& dataFile)
 {
 	printf("readNextRecordBlock ST\n");
-	printf("  file.sizeFile=%d\n", file.sizeFile);
-	printf("  file.offset=%d\n", file.offset);
+	static bool firstRead = true;
+
+	printf("  dataFile.sizeFile=%d\n", dataFile.sizeFile);
+	printf("  dataFile.offset=%d\n", dataFile.offset);
 
 	// there are no space for Record
 	size_t sizeToRead;
 	
-	sizeToRead = file.sizeFile - file.offset;
+	sizeToRead = dataFile.sizeFile - dataFile.offset;
 	printf("  sizeToRead=%d\n", sizeToRead);
 	printf("  sizeof(index_s)=%ld\n", sizeof(index_s));
 
+	if (sizeToRead < dataFile.sizePage)
+	{
+		return false;
+	}
+	/*
 	if (sizeToRead < sizeof(index_s))
 	{
 		return false;
@@ -153,24 +156,29 @@ bool readNextRecordBlock(struct dataFileStruct& file)
 	unsigned  count;
 
 	count = sizeToRead / sizeof(index_s);
-	if (count > file.countRecordInMemory)
+	if (count > dataFile.countRecordInMemory)
 	{
-		count = file.countRecordInMemory;		// count Records in Memory ( max )
+		count = dataFile.countRecordInMemory;		// count Records in Memory ( max )
 	}
 	printf("  count=%d\n", count);
-	file.countRecord = count;
+	dataFile.countRecord = count;
 
 	sizeToRead = count * sizeof(index_s);
 	printf("  sizeToRead-2=%d\n", sizeToRead);
+	//*/
+	sizeToRead = dataFile.sizePage + 8;			// additional 8 bytes for 'index_hdr_s'
+	dataFile.countRecord = dataFile.countRecordInMemory;
 
-	file.pHeapMemory = mmap(NULL, sizeToRead, PROT_READ | PROT_WRITE, MAP_SHARED, file.fd, file.offset);
-	if (file.pHeapMemory == NULL)
+	u_char* pHeapMemory_ = (u_char*)mmap(NULL, sizeToRead, PROT_READ | PROT_WRITE, MAP_SHARED, dataFile.fd, dataFile.offset) + 8;
+	dataFile.pHeapMemory = (void*)pHeapMemory_;
+
+	if (dataFile.pHeapMemory == NULL)
 	{
 		printf("Error: cannot map Records in the Memory\n");
 		return false;
 	}
-	file.offset += sizeToRead;
-	printf("  file.offset=%d\n", file.offset);
+	dataFile.offset += dataFile.sizePage;
+	printf("  dataFile.offset=%d\n", dataFile.offset);
 
 	printf("readNextRecordBlock OK\n");
 	return true;
@@ -178,6 +186,7 @@ bool readNextRecordBlock(struct dataFileStruct& file)
 
 int compare(const void* pRecord1, const void* pRecord2)
 {
+	return 0;
 
 	index_s* r1 = (index_s*)pRecord1;
 	index_s* r2 = (index_s*)pRecord2;
@@ -195,16 +204,16 @@ int compare(const void* pRecord1, const void* pRecord2)
 
 void sort(void* pHeapMemory, uint64_t indexRecord, uint64_t countRecordInBlock, unsigned indexThread)
 {
-	printf("sort ST ( indexThread = %02d )\n", indexThread);
+	static pthread_mutex_t	lock = PTHREAD_MUTEX_INITIALIZER;
+	pthread_mutex_lock(&lock);
 
 	index_s* pBlock = (index_s*)pHeapMemory + indexRecord;
 	qsort((void*)pBlock, countRecordInBlock, sizeof(index_s), compare);
 
-	printf("sort OK\n");
-
+	pthread_mutex_unlock(&lock);
 }
 
-void switchNextOperation(struct dataThread* pData, unsigned& stepMerge)
+void switchNextOperation(struct dataThread* pData)
 {
 	printf("switchNextOperation ST ( Thread_%02d )\n", pData->index);
 
@@ -225,14 +234,14 @@ void switchNextOperation(struct dataThread* pData, unsigned& stepMerge)
 	if (pData->pDataSync->operation == TO_SORT)
 	{
 		printf("switchNextOperation OK [ TO_SORT --> TO_MERGE ]\n");
-		stepMerge = pData->pDataFile->countRecordInBlock *2;
+		pData->pDataFile->stepMerge = pData->pDataFile->countRecordInBlock *2;
 		pData->pDataSync->operation = TO_MERGE;
 		return;
 	}
 	if (pData->pDataSync->operation == TO_MERGE)
 	{
-		stepMerge *= 2;
-		if (stepMerge <= pData->pDataFile->countRecord)
+		pData->pDataFile->stepMerge *= 2;
+		if (pData->pDataFile->stepMerge <= pData->pDataFile->countRecord)
 		{
 			return;												// continue Merge Operation
 		}

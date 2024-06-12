@@ -39,7 +39,8 @@ int main(int argc, char** argv)
     }
     else
     {
-        countRecord = config.recordNo_arg % 256;
+        countRecord = config.recordNo_arg;
+///        countRecord = config.recordNo_arg / 256;
     }
     write(fd, (void*)&countRecord, sizeof(uint64_t));
 

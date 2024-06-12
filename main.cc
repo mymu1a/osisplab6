@@ -7,6 +7,7 @@
 
 #include <sys/stat.h>        /* For mode constants */
 #include <fcntl.h>           /* For O_* constants */
+#include <sys/mman.h>
 
 #include "gengetopt/cmdline.h"
 
@@ -29,7 +30,7 @@ int main(int argc, char** argv)
 
     // open file with Records
 
-    dataFile.fd = open(config.filename_arg, O_RDWR | O_CREAT, 0666);
+    dataFile.fd = open(config.filename_arg, O_RDWR, 0666);
     if (dataFile.fd < 0)
     {
         printf("Error: cannot open file: %s\n", config.filename_arg);
@@ -48,8 +49,15 @@ int main(int argc, char** argv)
     }
     read(dataFile.fd, (void*)&dataFile.countRecordOnDisk, sizeof(uint64_t));
     dataFile.offset = sizeof(uint64_t);
+
+    printf("dataFile.sizeFile=%ld\n", dataFile.sizeFile);
     printf("countRecordOnDisk=%ld\n", dataFile.countRecordOnDisk);
 
+    if (dataFile.countRecordOnDisk < COUNT_RECORD_INMEMORY)
+    {
+        printf("Error: file is too small. Min count Record: %ld\n", COUNT_RECORD_INMEMORY);
+        return 1;
+    }
     // calc count Records in Block
 
     if (config.blocks_arg == 0)
@@ -70,9 +78,18 @@ int main(int argc, char** argv)
     }
     else
     {
-        dataFile.countRecordInMemory = config.memsize_arg % sizeof(index_s);
+        dataFile.countRecordInMemory = config.memsize_arg / sizeof(index_s) / COUNT_RECORD_INMEMORY;
+        dataFile.countRecordInMemory *= COUNT_RECORD_INMEMORY;
     }
     printf("countRecordInMemory=%ld\n", dataFile.countRecordInMemory);
+
+    dataFile.sizePage = getpagesize();
+    if (dataFile.sizePage != 4096)
+    {
+        printf("Error: size Page != 4096\n");
+        return 1;
+    }
+    dataFile.offset = 0;
 
     //=== create Synchronization Objects ===
     struct dataSyncStruct    dataSync;
