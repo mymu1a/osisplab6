@@ -6,6 +6,8 @@
 #include <stdlib.h>
 
 #include <sys/mman.h>
+#include <string.h>
+#include <errno.h>
 
 
 
@@ -172,9 +174,10 @@ bool readNextRecordBlock(struct dataFileStruct& dataFile)
 	u_char* pHeapMemory_ = (u_char*)mmap(NULL, sizeToRead, PROT_READ | PROT_WRITE, MAP_SHARED, dataFile.fd, dataFile.offset) + 8;
 	dataFile.pHeapMemory = (void*)pHeapMemory_;
 
-	if (dataFile.pHeapMemory == NULL)
+	if (dataFile.pHeapMemory == MAP_FAILED)
 	{
 		printf("Error: cannot map Records in the Memory\n");
+		printf("%s\n", strerror(errno));
 		return false;
 	}
 	dataFile.offset += dataFile.sizePage;
